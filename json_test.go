@@ -357,6 +357,72 @@ var testdata = []struct {
 		// wantStd: `{k.1 :"v"}`,
 		wantErr: fmt.Errorf("hujson: line 1, column 2: %w", errors.New("invalid literal: 1xy")),
 	},
+	{
+		in: `{1xy:"v"}`,
+		want: Value{
+			BeforeExtra: nil,
+			StartOffset: 0,
+			Value:       &Object{},
+			AfterExtra:  nil,
+		},
+		// wantMin: `{"k":"v"}`,
+		// wantStd: `{k.1 :"v"}`,
+		wantErr: fmt.Errorf("hujson: line 1, column 2: %w", errors.New("invalid literal: 1xy")),
+	},
+	{
+		in: `{pos: {x: 1, y: 2}}`,
+		want: Value{
+			BeforeExtra: nil,
+			Value: &Object{
+				Members: []ObjectMember{
+					{
+						Name: Value{
+							Value:       Literal("pos"),
+							StartOffset: 1,
+							EndOffset:   4,
+						},
+						Value: Value{
+							BeforeExtra: Extra(" "),
+							StartOffset: 6,
+							EndOffset:   18,
+							Value: &Object{
+								Members: []ObjectMember{
+									{
+										Name: Value{
+											Value:       Literal("x"),
+											StartOffset: 7,
+											EndOffset:   8,
+										},
+										Value: Value{
+											BeforeExtra: Extra(" "),
+											Value:       Literal("1"),
+											StartOffset: 10,
+											EndOffset:   11,
+										},
+									},
+									{
+										Name: Value{
+											Value:       Literal("y"),
+											StartOffset: 13,
+											EndOffset:   14,
+											BeforeExtra: Extra(" "),
+										},
+										Value: Value{
+											BeforeExtra: Extra(" "),
+											Value:       Literal("2"),
+											StartOffset: 16,
+											EndOffset:   17,
+										},
+									},
+								},
+							}}},
+				}},
+			StartOffset: 0,
+			EndOffset:   19,
+		},
+		wantMin: `{pos:{x:1,y:2}}`,
+		wantStd: `{pos: {x: 1, y: 2}}`,
+	},
 }
 
 func Test(t *testing.T) {

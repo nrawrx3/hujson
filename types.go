@@ -92,7 +92,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
 	"math"
 	"strconv"
 	"strings"
@@ -272,7 +271,6 @@ func (b Literal) IsUnquotedKey() bool {
 	}
 
 	if isUnquotedIdentifier && (string(b) == "null" || string(b) == "false" || string(b) == "true") {
-		log.Printf("%s is unquoted but is keyword", b)
 		isKeyword = true
 	}
 

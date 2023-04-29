@@ -37,19 +37,18 @@ func Parse(b []byte) (Value, error) {
 
 func parseKey(n int, b []byte) (v Value, _ int, err error) {
 	// Consume leading whitespace and comments.
-	nBeforeConsumeExtra := n // Need this so that existing parseNext function can fill it BeforeExtra correctly.
+	n0 := n
 	if n, err = consumeExtra(n, b); err != nil {
 		return v, n, err
 	}
 
 	// If string is quoted or has an invalid first character for an unquoted key, use parseNext.
 	if len(b) > n {
-		if b[n] == '"' || !strings.ContainsRune("_abcdefghijklmnlnopqrstuvwxyzABCDEFGHIJKLMNLNOPQRSTUVWXYZ", rune(b[n])) {
-			return parseNext(nBeforeConsumeExtra, b)
+		if b[n] == '"' || !strings.ContainsRune("_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ", rune(b[n])) {
+			return parseNext(n0, b)
 		}
 	}
 
-	n0 := n
 	if n > n0 {
 		v.BeforeExtra = b[n0:n:n]
 	}
@@ -63,19 +62,19 @@ loop:
 			return Value{}, n, fmt.Errorf("parsing unquoted key: %w", io.ErrUnexpectedEOF)
 
 		// Disallow numeric as first character
-		case n == n0 && strings.ContainsRune("-1234567890", rune(b[n])):
+		case n == v.StartOffset && strings.ContainsRune("-1234567890", rune(b[n])):
 			return Value{}, n, fmt.Errorf("parsing unquoted key, invalid first character: '%c'", b[n])
 
 		case strings.ContainsRune(":\n\r\t ", rune(b[n])):
-			lit := Literal(b[n0:n:n])
+			lit := Literal(b[v.StartOffset:n:n])
 
 			// Surround with quotes and check if it's a valid key using json.Valid
-			withQuotes := make([]byte, 0, n-n0+2)
+			withQuotes := make([]byte, 0, n-v.StartOffset+2)
 			withQuotes = append(withQuotes, byte('"'))
 			withQuotes = append(withQuotes, lit...)
 			withQuotes = append(withQuotes, '"')
 			if !Literal(withQuotes).IsValid() {
-				return Value{}, n0, fmt.Errorf("invalid literal: %s", lit)
+				return Value{}, v.StartOffset, fmt.Errorf("invalid literal: %s", lit)
 			}
 			v.Value = lit
 			break loop
