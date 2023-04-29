@@ -49,25 +49,41 @@ func (v *Value) updateOffsets(n int) int {
 // The output is valid so long as every Extra and Literal in the Value is valid.
 // The output does not alias the memory of any buffers referenced by v.
 func (v Value) Pack() []byte {
-	return v.append(nil)
+	return v.append(nil, false)
+}
+
+func (v Value) PackWithQuotedKeys() []byte {
+	return v.append(nil, true)
 }
 
 // String is a string representation of v.
 func (v Value) String() string {
-	return string(v.append(nil))
+	return string(v.append(nil, false))
 }
 
-func (v Value) append(b []byte) []byte {
+func appendLiteral(lit Literal, b []byte, quoteKeys bool) []byte {
+	if quoteKeys && lit.IsUnquotedKey() {
+		b = append(b, '"')
+		b = append(b, lit...)
+		b = append(b, '"')
+	} else {
+		b = append(b, lit...)
+	}
+	return b
+}
+
+func (v Value) append(b []byte, quoteKeys bool) []byte {
 	b = append(b, v.BeforeExtra...)
 	switch v2 := v.Value.(type) {
 	case Literal:
-		b = append(b, v2...)
+		b = appendLiteral(v2, b, quoteKeys)
+
 	case *Object:
 		b = append(b, '{')
 		for _, m := range v2.Members {
-			b = m.Name.append(b)
+			b = m.Name.append(b, quoteKeys)
 			b = append(b, ':')
-			b = m.Value.append(b)
+			b = m.Value.append(b, quoteKeys)
 			b = append(b, ',')
 		}
 		if v2.length() > 0 && !hasTrailingComma(v2) {
@@ -78,7 +94,7 @@ func (v Value) append(b []byte) []byte {
 	case *Array:
 		b = append(b, '[')
 		for _, e := range v2.Elements {
-			b = e.append(b)
+			b = e.append(b, quoteKeys)
 			b = append(b, ',')
 		}
 		if v2.length() > 0 && !hasTrailingComma(v2) {

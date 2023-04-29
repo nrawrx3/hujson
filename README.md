@@ -1,5 +1,8 @@
 # HuJSON - "Human JSON" ([JWCC](https://nigeltao.github.io/blog/2021/json-with-commas-comments.html))
 
+**This is a fork that adds support for object keys without quotes**
+
+
 The `github.com/tailscale/hujson` package implements
 the [JWCC](https://nigeltao.github.io/blog/2021/json-with-commas-comments.html) extension
 of [standard JSON](https://datatracker.ietf.org/doc/html/rfc8259).
@@ -32,3 +35,9 @@ the following snippet to your Visual Studio Code configuration:
     }
 }]
 ```
+
+## Unquoted keys
+
+Edited to support unquoted keys like for example `{position: {x: 1, y: 2}}`. The
+unquoted keys can be any JS variable name with ASCII characters. The syntax of
+an unquoted key in PCRE regex would be `[:alpha:][:alnum:]*`.

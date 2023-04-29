@@ -12,8 +12,7 @@
 //
 // See https://nigeltao.github.io/blog/2021/json-with-commas-comments.html
 //
-//
-// Functionality
+// # Functionality
 //
 // The Parse function parses HuJSON input as a Value,
 // which is a syntax tree exactly representing the input.
@@ -32,8 +31,7 @@
 // but instead for the HuJSON and standard JSON format.
 // The Patch method applies a JSON Patch (RFC 6902) to the receiving value.
 //
-//
-// Grammar
+// # Grammar
 //
 // The changes to the JSON grammar are:
 //
@@ -72,8 +70,7 @@
 //	 	'000A' ws
 //	 	'000D' ws
 //
-//
-// Use with the Standard Library
+// # Use with the Standard Library
 //
 // This package operates with HuJSON as an AST. In order to parse HuJSON
 // into arbitrary Go types, use this package to parse HuJSON input as an AST,
@@ -97,6 +94,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -154,6 +152,8 @@ type ValueTrimmed interface {
 	Kind() Kind
 	// clone returns a deep copy of the value.
 	clone() ValueTrimmed
+
+	IsUnquotedKey() bool
 
 	isValueTrimmed()
 }
@@ -259,6 +259,22 @@ func (b Literal) Kind() Kind {
 	default:
 		return 0
 	}
+}
+
+func (b Literal) IsUnquotedKey() bool {
+	isUnquotedIdentifier := true
+	isKeyword := false
+
+	if len(b) > 0 && (strings.ContainsRune("-1234567890\"", rune(b[0]))) {
+		// log.Printf("%s contains -1234567890\"", b)
+		isUnquotedIdentifier = false
+	}
+
+	if isUnquotedIdentifier && (string(b) == "null" || string(b) == "false" || string(b) == "true") {
+		isKeyword = true
+	}
+
+	return isUnquotedIdentifier && !isKeyword
 }
 
 // IsValid reports whether b is a valid JSON null, boolean, string, or number.
@@ -389,6 +405,8 @@ func (obj Object) clone() ValueTrimmed {
 
 func (Object) Kind() Kind { return '{' }
 
+func (Object) IsUnquotedKey() bool { return false }
+
 func (*Object) isValueTrimmed() {}
 
 // Array is an exact syntactic representation of a JSON array.
@@ -448,6 +466,8 @@ func (arr Array) clone() ValueTrimmed {
 }
 
 func (Array) Kind() Kind { return '[' }
+
+func (Array) IsUnquotedKey() bool { return false }
 
 func (*Array) isValueTrimmed() {}
 

@@ -182,7 +182,7 @@ var testdataPatch = []struct {
 }, {
 	in:      `{}`,
 	patch:   `[{`,
-	wantErr: fmt.Errorf(`hujson: line 1, column 3: %w`, fmt.Errorf("parsing value: %w", io.ErrUnexpectedEOF)),
+	wantErr: fmt.Errorf(`hujson: line 1, column 3: %w`, fmt.Errorf("parsing unquoted key: %w", io.ErrUnexpectedEOF)),
 }, {
 	in:      `{}`,
 	patch:   `{}`,
