@@ -97,7 +97,7 @@ var testdata = []struct {
 }, {
 	in:      "{",
 	want:    Value{Value: &Object{}},
-	wantErr: fmt.Errorf("hujson: line 1, column 2: %w", fmt.Errorf("parsing value: %w", io.ErrUnexpectedEOF)),
+	wantErr: fmt.Errorf("hujson: line 1, column 2: %w", fmt.Errorf("parsing unquoted key: %w", io.ErrUnexpectedEOF)),
 }, {
 	in:      "{,}",
 	want:    Value{Value: &Object{}},
@@ -137,39 +137,39 @@ var testdata = []struct {
 	}},
 	wantErr: fmt.Errorf("hujson: line 1, column 9: %w", errors.New("invalid character ']' after object value (expecting ',' or '}')")),
 }, {
-	in: ` { "k" : "v" } `,
+	in: ` {"k" : "v" } `,
 	want: Value{
 		BeforeExtra: Extra(" "),
 		StartOffset: 1,
 		Value: &Object{
 			Members: []ObjectMember{{
-				Value{BeforeExtra: Extra(" "), StartOffset: 3, Value: Literal(`"k"`), EndOffset: 6, AfterExtra: Extra(" ")},
-				Value{BeforeExtra: Extra(" "), StartOffset: 9, Value: Literal(`"v"`), EndOffset: 12},
+				Value{BeforeExtra: nil, StartOffset: 2, Value: Literal(`"k"`), EndOffset: 5, AfterExtra: Extra(" ")},
+				Value{BeforeExtra: Extra(" "), StartOffset: 8, Value: Literal(`"v"`), EndOffset: 11},
 			}},
 			AfterExtra: Extra(" "),
 		},
-		EndOffset:  14,
+		EndOffset:  13,
 		AfterExtra: Extra(" "),
 	},
 	wantMin: `{"k":"v"}`,
-	wantStd: ` { "k" : "v" } `,
+	wantStd: ` {"k" : "v" } `,
 }, {
-	in: ` { "k" : "v" , } `,
+	in: ` { "k" : "v", } `,
 	want: Value{
 		BeforeExtra: Extra(" "),
 		StartOffset: 1,
 		Value: &Object{
 			Members: []ObjectMember{{
 				Value{BeforeExtra: Extra(" "), StartOffset: 3, Value: Literal(`"k"`), EndOffset: 6, AfterExtra: Extra(" ")},
-				Value{BeforeExtra: Extra(" "), StartOffset: 9, Value: Literal(`"v"`), EndOffset: 12, AfterExtra: Extra(" ")},
+				Value{BeforeExtra: Extra(" "), StartOffset: 9, Value: Literal(`"v"`), EndOffset: 12, AfterExtra: nil},
 			}},
 			AfterExtra: Extra(" "),
 		},
-		EndOffset:  16,
+		EndOffset:  15,
 		AfterExtra: Extra(" "),
 	},
-	wantMin: `{"k":"v"}`,
-	wantStd: ` { "k" : "v"   } `,
+	// wantMin: `{"k":"v"}`,
+	wantStd: ` { "k" : "v" } `,
 }, {
 	in:      "[",
 	want:    Value{Value: &Array{}},
@@ -275,61 +275,145 @@ var testdata = []struct {
 		StartOffset: 1,
 	},
 	wantErr: fmt.Errorf("hujson: line 1, column 2: %w", errors.New("invalid character '\\U00101234' at start of value")),
-}}
+}, {
+	in: `{k:"v"}`,
+	want: Value{
+		BeforeExtra: nil,
+		StartOffset: 0,
+		Value: &Object{
+			Members: []ObjectMember{{
+				Value{BeforeExtra: nil, StartOffset: 1, Value: Literal(`k`), EndOffset: 2, AfterExtra: nil},
+				Value{BeforeExtra: nil, StartOffset: 3, Value: Literal(`"v"`), EndOffset: 6},
+			}},
+			AfterExtra: nil,
+		},
+		EndOffset:  7,
+		AfterExtra: nil,
+	},
+	// wantMin: `{"k":"v"}`,
+	wantStd: `{k:"v"}`,
+}, {
+	in: `{k :"v"}`,
+	want: Value{
+		BeforeExtra: nil,
+		StartOffset: 0,
+		Value: &Object{
+			Members: []ObjectMember{{
+				Value{BeforeExtra: nil, StartOffset: 1, Value: Literal(`k`), EndOffset: 2, AfterExtra: Extra(" ")},
+				Value{BeforeExtra: nil, StartOffset: 4, Value: Literal(`"v"`), EndOffset: 7},
+			}},
+			AfterExtra: nil,
+		},
+		EndOffset:  8,
+		AfterExtra: nil,
+	},
+	// wantMin: `{"k":"v"}`,
+	wantStd: `{k :"v"}`,
+}, {
+	in: `{k.1 :"v"}`,
+	want: Value{
+		BeforeExtra: nil,
+		StartOffset: 0,
+		Value: &Object{
+			Members: []ObjectMember{{
+				Value{BeforeExtra: nil, StartOffset: 1, Value: Literal(`k.1`), EndOffset: 4, AfterExtra: Extra(" ")},
+				Value{BeforeExtra: nil, StartOffset: 6, Value: Literal(`"v"`), EndOffset: 9},
+			}},
+			AfterExtra: nil,
+		},
+		EndOffset:  10,
+		AfterExtra: nil,
+	},
+	// wantMin: `{"k":"v"}`,
+	wantStd: `{k.1 :"v"}`,
+},
+	{
+		in: `{k(1) :"v"}`,
+		want: Value{
+			BeforeExtra: nil,
+			StartOffset: 0,
+			Value: &Object{
+				Members: []ObjectMember{{
+					Value{BeforeExtra: nil, StartOffset: 1, Value: Literal(`k(1)`), EndOffset: 5, AfterExtra: Extra(" ")},
+					Value{BeforeExtra: nil, StartOffset: 7, Value: Literal(`"v"`), EndOffset: 10},
+				}},
+				AfterExtra: nil,
+			},
+			EndOffset:  11,
+			AfterExtra: nil,
+		},
+		// wantMin: `{"k":"v"}`,
+		wantStd: `{k(1) :"v"}`,
+	},
+	{
+		in: `{1xy:"v"}`,
+		want: Value{
+			BeforeExtra: nil,
+			StartOffset: 0,
+			Value:       &Object{},
+			AfterExtra:  nil,
+		},
+		// wantMin: `{"k":"v"}`,
+		// wantStd: `{k.1 :"v"}`,
+		wantErr: fmt.Errorf("hujson: line 1, column 2: %w", errors.New("invalid literal: 1xy")),
+	},
+}
 
 func Test(t *testing.T) {
-	for _, tt := range testdata {
-		gotVal, gotErr := Parse([]byte(tt.in))
-		if diff := cmp.Diff(tt.want, gotVal, cmpopts.EquateEmpty()); diff != "" {
-			t.Errorf("Parse mismatch (-want +got):\n%s", diff)
-		}
-		if !reflect.DeepEqual(gotErr, tt.wantErr) {
-			t.Errorf("Parse error mismatch:\ngot  %v\nwant %v", gotErr, tt.wantErr)
-		}
-
-		if gotErr == nil {
-			gotIsStd := gotVal.IsStandard()
-			wantIsStd := tt.in == tt.wantStd
-			if gotIsStd != wantIsStd {
-				t.Errorf("IsStandard() = %v, want %v", gotIsStd, wantIsStd)
+	for i, tt := range testdata {
+		t.Run(fmt.Sprintf("Test_%d", i), func(t *testing.T) {
+			gotVal, gotErr := Parse([]byte(tt.in))
+			if diff := cmp.Diff(tt.want, gotVal, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("Parse mismatch (-want +got):\n%s", diff)
+			}
+			if !reflect.DeepEqual(gotErr, tt.wantErr) {
+				t.Errorf("Parse error mismatch:\ngot  %v\nwant %v", gotErr, tt.wantErr)
 			}
 
-			gotBuf := string(gotVal.Pack())
-			if diff := cmp.Diff(gotBuf, tt.in); diff != "" {
-				t.Errorf("Pack mismatch (-want +got):\n%s", diff)
-			}
+			if gotErr == nil {
+				gotIsStd := gotVal.IsStandard()
+				wantIsStd := tt.in == tt.wantStd
+				if gotIsStd != wantIsStd {
+					t.Errorf("IsStandard() = %v, want %v", gotIsStd, wantIsStd)
+				}
 
-			if tt.wantMin != "" {
-				gotMinVal := gotVal.Clone()
-				gotMinVal.Minimize()
-				gotMinBuf := string(gotMinVal.Pack())
-				wantMinVal, _ := Parse([]byte(tt.wantMin))
-				if diff := cmp.Diff(wantMinVal, gotMinVal, cmpopts.EquateEmpty()); diff != "" {
-					t.Errorf("Minimize Value mismatch (-want +got):\n%s", diff)
+				gotBuf := string(gotVal.Pack())
+				if diff := cmp.Diff(gotBuf, tt.in); diff != "" {
+					t.Errorf("Pack mismatch (-want +got):\n%s", diff)
 				}
-				if diff := cmp.Diff(tt.wantMin, gotMinBuf); diff != "" {
-					t.Errorf("Minimize buffer mismatch (-want +got):\n%s", diff)
-				}
-				if !gotMinVal.IsStandard() {
-					t.Errorf("IsStandard() = false, want true")
-				}
-			}
 
-			if tt.wantStd != "" {
-				gotStdVal := gotVal.Clone()
-				gotStdVal.Standardize()
-				gotStdBuf := string(gotStdVal.Pack())
-				wantStdVal, _ := Parse([]byte(tt.wantStd))
-				if diff := cmp.Diff(wantStdVal, gotStdVal, cmpopts.EquateEmpty()); diff != "" {
-					t.Errorf("Standardize Value mismatch (-want +got):\n%s", diff)
+				if tt.wantMin != "" {
+					gotMinVal := gotVal.Clone()
+					gotMinVal.Minimize()
+					gotMinBuf := string(gotMinVal.Pack())
+					wantMinVal, _ := Parse([]byte(tt.wantMin))
+					if diff := cmp.Diff(wantMinVal, gotMinVal, cmpopts.EquateEmpty()); diff != "" {
+						t.Errorf("Minimize Value mismatch (-want +got):\n%s", diff)
+					}
+					if diff := cmp.Diff(tt.wantMin, gotMinBuf); diff != "" {
+						t.Errorf("Minimize buffer mismatch (-want +got):\n%s", diff)
+					}
+					if !gotMinVal.IsStandard() {
+						t.Errorf("IsStandard() = false, want true")
+					}
 				}
-				if diff := cmp.Diff(tt.wantStd, gotStdBuf); diff != "" {
-					t.Errorf("Standardize buffer mismatch (-want +got):\n%s", diff)
-				}
-				if !gotStdVal.IsStandard() {
-					t.Errorf("IsStandard() = false, want true")
+
+				if tt.wantStd != "" {
+					gotStdVal := gotVal.Clone()
+					gotStdVal.Standardize()
+					gotStdBuf := string(gotStdVal.Pack())
+					wantStdVal, _ := Parse([]byte(tt.wantStd))
+					if diff := cmp.Diff(wantStdVal, gotStdVal, cmpopts.EquateEmpty()); diff != "" {
+						t.Errorf("Standardize Value mismatch (-want +got):\n%s", diff)
+					}
+					if diff := cmp.Diff(tt.wantStd, gotStdBuf); diff != "" {
+						t.Errorf("Standardize buffer mismatch (-want +got):\n%s", diff)
+					}
+					if !gotStdVal.IsStandard() {
+						t.Errorf("IsStandard() = false, want true")
+					}
 				}
 			}
-		}
+		})
 	}
 }

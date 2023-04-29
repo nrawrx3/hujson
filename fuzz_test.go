@@ -38,7 +38,9 @@ func Fuzz(f *testing.F) {
 		// Standardize should produce valid JSON.
 		v2 := v.Clone()
 		v2.Standardize()
-		b2 := v2.Pack()
+		b2 := v2.PackWithQuotedKeys()
+
+		// TODO: Convert json.Valid only after adding quotes to unquoted keys
 		if !json.Valid(b2) {
 			t.Fatalf("input %q: Standardize failure", b)
 		}

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"unicode"
 	"unicode/utf8"
 )
@@ -32,6 +33,65 @@ func Parse(b []byte) (Value, error) {
 		return v, err
 	}
 	return v, nil
+}
+
+func parseKey(n int, b []byte) (v Value, _ int, err error) {
+	// Consume leading whitespace and comments.
+	nBeforeConsumeExtra := n // Need this so that existing parseNext function can fill it BeforeExtra correctly.
+	if n, err = consumeExtra(n, b); err != nil {
+		return v, n, err
+	}
+
+	// If string is quoted or has an invalid first character for an unquoted key, use parseNext.
+	if len(b) > n {
+		if b[n] == '"' || !strings.ContainsRune("_abcdefghijklmnlnopqrstuvwxyzABCDEFGHIJKLMNLNOPQRSTUVWXYZ", rune(b[n])) {
+			return parseNext(nBeforeConsumeExtra, b)
+		}
+	}
+
+	n0 := n
+	if n > n0 {
+		v.BeforeExtra = b[n0:n:n]
+	}
+
+	v.StartOffset = n
+
+loop:
+	for {
+		switch {
+		case len(b) == n:
+			return Value{}, n, fmt.Errorf("parsing unquoted key: %w", io.ErrUnexpectedEOF)
+
+		// Disallow numeric as first character
+		case n == n0 && strings.ContainsRune("-1234567890", rune(b[n])):
+			return Value{}, n, fmt.Errorf("parsing unquoted key, invalid first character: '%c'", b[n])
+
+		case strings.ContainsRune(":\n\r\t ", rune(b[n])):
+			lit := Literal(b[n0:n:n])
+
+			// Surround with quotes and check if it's a valid key using json.Valid
+			withQuotes := make([]byte, 0, n-n0+2)
+			withQuotes = append(withQuotes, byte('"'))
+			withQuotes = append(withQuotes, lit...)
+			withQuotes = append(withQuotes, '"')
+			if !Literal(withQuotes).IsValid() {
+				return Value{}, n0, fmt.Errorf("invalid literal: %s", lit)
+			}
+			v.Value = lit
+			break loop
+		}
+		n++
+	}
+	v.EndOffset = n
+	// Consume trailing whitespace and comments
+	if n, err = consumeExtra(n, b); err != nil {
+		return v, n, err
+	}
+
+	if n > v.EndOffset {
+		v.AfterExtra = b[v.EndOffset:n:n]
+	}
+	return v, n, nil
 }
 
 // parseNext parses the next value with surrounding whitespace and comments.
@@ -83,8 +143,8 @@ func parseNextTrimmed(n int, b []byte) (ValueTrimmed, int, error) {
 			var vk, vv Value
 			var err error
 
-			// Parse the name.
-			if vk, n, err = parseNext(n, b); err != nil {
+			// Parse the key
+			if vk, n, err = parseKey(n, b); err != nil {
 				if err == errInvalidObjectEnd && vk.Value == nil {
 					setTrailingComma(&obj, len(obj.Members) > 0)
 					obj.AfterExtra = vk.BeforeExtra
@@ -92,7 +152,7 @@ func parseNextTrimmed(n int, b []byte) (ValueTrimmed, int, error) {
 				}
 				return &obj, n, err
 			}
-			if vk.Value.Kind() != '"' {
+			if !vk.Value.IsUnquotedKey() && vk.Value.Kind() != '"' { // TODO(soumikr): Can be optimized if we implement a IsKey() method on ValueTrimmed
 				return &obj, vk.StartOffset, newInvalidCharacterError(b[vk.StartOffset:], "at start of object name")
 			}
 
