@@ -153,7 +153,7 @@ type ValueTrimmed interface {
 	// clone returns a deep copy of the value.
 	clone() ValueTrimmed
 
-	IsUnquotedKey() bool
+	isUnquotedKey() bool
 
 	isValueTrimmed()
 }
@@ -261,7 +261,9 @@ func (b Literal) Kind() Kind {
 	}
 }
 
-func (b Literal) IsUnquotedKey() bool {
+// This should only be called when it is know that b is indeed an object key
+// literal. We do not check for validity of the key like we do in parseKey.
+func (b Literal) isUnquotedKey() bool {
 	isUnquotedIdentifier := true
 	isKeyword := false
 
@@ -375,6 +377,29 @@ func (obj Object) rangeValues(f func(*Value) bool) bool {
 	}
 	return true
 }
+
+func (obj Object) quoteUnquotedKeys() {
+	for i, member := range obj.Members {
+		if member.Name.Value.isUnquotedKey() {
+			lit := member.Name.Value.(Literal)
+			withQuotes := make([]byte, 0, len(lit)+2)
+			withQuotes = append(withQuotes, '"')
+			withQuotes = append(withQuotes, lit...)
+			withQuotes = append(withQuotes, '"')
+			obj.Members[i].Name.Value = Literal(withQuotes)
+		}
+	}
+}
+
+func (obj Object) hasQuotedKeys() bool {
+	for _, member := range obj.Members {
+		if member.Name.Value.isUnquotedKey() {
+			return true
+		}
+	}
+	return false
+}
+
 func (obj Object) lastValue() *Value {
 	if len(obj.Members) > 0 {
 		return &obj.Members[len(obj.Members)-1].Value
@@ -405,7 +430,7 @@ func (obj Object) clone() ValueTrimmed {
 
 func (Object) Kind() Kind { return '{' }
 
-func (Object) IsUnquotedKey() bool { return false }
+func (Object) isUnquotedKey() bool { return false }
 
 func (*Object) isValueTrimmed() {}
 
@@ -467,7 +492,7 @@ func (arr Array) clone() ValueTrimmed {
 
 func (Array) Kind() Kind { return '[' }
 
-func (Array) IsUnquotedKey() bool { return false }
+func (Array) isUnquotedKey() bool { return false }
 
 func (*Array) isValueTrimmed() {}
 

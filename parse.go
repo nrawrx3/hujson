@@ -151,7 +151,7 @@ func parseNextTrimmed(n int, b []byte) (ValueTrimmed, int, error) {
 				}
 				return &obj, n, err
 			}
-			if !vk.Value.IsUnquotedKey() && vk.Value.Kind() != '"' { // TODO(soumikr): Can be optimized if we implement a IsKey() method on ValueTrimmed
+			if !vk.Value.isUnquotedKey() && vk.Value.Kind() != '"' { // TODO(soumikr): Can be optimized if we implement a IsKey() method on ValueTrimmed
 				return &obj, vk.StartOffset, newInvalidCharacterError(b[vk.StartOffset:], "at start of object name")
 			}
 

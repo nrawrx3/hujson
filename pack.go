@@ -62,7 +62,7 @@ func (v Value) String() string {
 }
 
 func appendLiteral(lit Literal, b []byte, quoteKeys bool) []byte {
-	if quoteKeys && lit.IsUnquotedKey() {
+	if quoteKeys && lit.isUnquotedKey() {
 		b = append(b, '"')
 		b = append(b, lit...)
 		b = append(b, '"')

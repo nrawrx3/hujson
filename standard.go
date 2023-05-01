@@ -13,6 +13,13 @@ func (v *Value) isStandard() bool {
 	if !v.BeforeExtra.IsStandard() {
 		return false
 	}
+
+	if obj, ok := v.Value.(*Object); ok {
+		if obj.hasQuotedKeys() {
+			return false
+		}
+	}
+
 	if comp, ok := v.Value.(composite); ok {
 		if !comp.rangeValues((*Value).isStandard) {
 			return false
@@ -35,8 +42,11 @@ func (b Extra) hasComment() bool {
 	return consumeWhitespace(b) < len(b)
 }
 
-// Minimize removes all whitespace, comments, and trailing commas from v,
-// making it compliant with standard JSON per RFC 8259.
+// Minimize removes all whitespace, comments, and trailing commas from v, making
+// it compliant with standard JSON per RFC 8259. Also assumes that unquoted keys
+// are *NOT* present.
+//
+// TODO: Take a standardize bool parameter
 func (v *Value) Minimize() {
 	v.minimize()
 	v.UpdateOffsets()
@@ -62,8 +72,14 @@ func (v *Value) Standardize() {
 }
 func (v *Value) standardize() bool {
 	v.BeforeExtra.standardize()
+
+	if obj, isObject := v.Value.(*Object); isObject {
+		obj.quoteUnquotedKeys()
+	}
+
 	if comp, ok := v.Value.(composite); ok {
 		comp.rangeValues((*Value).standardize)
+
 		if last := comp.lastValue(); last != nil && last.AfterExtra != nil {
 			*comp.afterExtra() = append(append(last.AfterExtra, ' '), *comp.afterExtra()...)
 			last.AfterExtra = nil
